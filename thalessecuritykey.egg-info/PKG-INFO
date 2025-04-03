@@ -1,0 +1,4 @@
+Metadata-Version: 2.4
+Name: thalessecuritykey
+Version: 0.0.4
+Requires-Dist: fido2
