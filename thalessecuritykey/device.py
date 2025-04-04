@@ -27,10 +27,8 @@
 # NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  
 
-
 from typing import Optional
-from .const import TAG_CHIP_REF, TAG_MODEL_NAME, TAG_NVM, TAG_PRODUCT_NAME, PkiApplet
-
+from .const import * 
 
 
 
@@ -40,14 +38,14 @@ class ThalesDevice():
         self._thales_serial_number  = None
         self._pki_version           = None
         self._pki_serial_number     = None
-        self._pki_applet            = PkiApplet.NONE
+        self._pki_applet            = PkiApplet.UNKNOWN
         self._name                  = name
         self._has_fido              = has_fido
         self._fido_version          = None
         self._is_thales_device      = False
-        self._nvm                   = None
         self._model_name            = None
         self._chip_ref              = None
+        self._device_info           = None
 
     
     @property
@@ -117,6 +115,63 @@ class ThalesDevice():
     def _parse_bytes(self, value : bytes):
         return value.decode("utf-8").split('\x00', 1)[0]
     
+    def _parse_card_manager(self, bytes):
+        index=0
+        while( index < len(bytes)):
+            tag     = bytes[index:index+1]
+            length  = bytes[index+1:index+2]
+            value   = bytes[index+2:index+2+int.from_bytes(length)]
+            index   += 2 + int.from_bytes(length)
+            if( tag == TAG_CM_SERIAL_NUMBER): 
+                self._thales_serial_number = value.decode("utf-8")
+            elif( tag == TAG_CM_PRODUCT_NAME):
+                self._name = value.decode("utf-8")
+            elif( tag == TAG_CM_MODEL_NAME):
+                self._model_name = value.decode("utf-8")
+            elif( tag == TAG_CM_MASK): 
+                self._chip_ref = value.decode("utf-8")
+            elif( tag == TAG_CM_DEVICE_INFO): 
+                self._parse_device_info(value)
+
+    def _parse_device_info(self, bytes):
+        #length = len(bytes)
+        capacity_byte = bytes[0]
+        if( capacity_byte&1 ):
+            self._pcsc_capable = True
+        if( capacity_byte&2 ):
+            self._nfc_capable = True
+        if( capacity_byte&4 ):
+            self._usb_capable = True
+        if( capacity_byte&8 ):
+            self._bio_capable = True
+        if( capacity_byte&32 ):
+            self._usb_a_capable = True
+        if( capacity_byte&64 ):
+            self._usb_c_capable = True
+        if( capacity_byte&128 ):
+            self._is_card = True
+        else:
+            self._token = True
+            
+        applet_byte = bytes[1]
+        if( applet_byte&1 ):
+            self.has_pki = True
+            self._pki_applet = PkiApplet.IDPRIME_930
+        if( applet_byte&2 ):
+            self.has_pki = True
+            self._pki_applet = PkiApplet.IDPRIME_940
+        if( applet_byte&4 ):
+            self.has_pki = True
+            self._pki_applet = PkiApplet.PIV
+        if( applet_byte&8 ):
+            self.has_fido = True
+        if( applet_byte&16 ):
+            self.has_otp = True
+
+        if( self._pki_applet == PkiApplet.UNKNOWN ):
+            self._pki_applet = PkiApplet.NONE
+
+    
     def _parse_info_file(self, bytes):
         try:
           if( bytes[0] == 0x01 ):
@@ -129,9 +184,7 @@ class ThalesDevice():
                 length  = bytes[index+4:index+5]
                 value   = bytes[index+5:index+5+int.from_bytes(length)]
                 index   += 5 + int.from_bytes(length)
-                if( tag == TAG_NVM): 
-                    self._nvm = int.from_bytes(value)
-                elif( tag == TAG_PRODUCT_NAME):
+                if( tag == TAG_PRODUCT_NAME):
                     self._name = value.decode("utf-8")
                 elif( tag == TAG_MODEL_NAME):
                     self._model_name = value.decode("utf-8")
@@ -157,6 +210,5 @@ class ThalesDevice():
         print (f"PKI Applet:  {self._pki_applet}")
         print (f"PKI Version: {self._pki_version}")
         if( full ):
-            print (f"NVM :        {self._nvm}")
             print (f"Model:       {self._model_name}")
             print (f"Chip:        {self._chip_ref}")

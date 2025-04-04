@@ -42,20 +42,7 @@ except ImportError:
     SW_SUCCESS     = (0x90, 0x00)
 
 from .device import PkiApplet, ThalesDevice
-from .const import (
-    ATRs,
-    AID_CARD_MANAGER, 
-    AID_IDPRIME, 
-    AID_PIV, 
-    AID_PIV_ADMIN,
-    APDU_PIV_GET_DATA,
-    APDU_IDP_GET_DATA,
-    APDU_GET_CONTAINER,
-    APDU_READ_BINARY, 
-    APDU_SELECT, 
-    APDU_SELECT_FILE, 
-    APDU_GET_SN,
-    APDU_GET_DETAILS)
+from .const import *
 
 
 
@@ -70,6 +57,7 @@ class PcscThalesDevice(ThalesDevice):
         if( self._conn.component.hcard == None):
             self._conn.connect()
 
+        self._check_card_manager()
         self._discovery()
         
         try:
@@ -83,28 +71,38 @@ class PcscThalesDevice(ThalesDevice):
             print("Error %r", e)
             pass
 
-
-
     def __repr__(self):
         return f"PcscThalesDevice({self.name}, {self.thales_serial_number})"
     
     def __eq__(self, other): 
         return self.thales_serial_number == other.thales_serial_number
             
-    def _discovery_pki(self):
+    def _discovery_pki(self):        
         if( self._select_by_aid(AID_PIV) ):
-            self.pki_applet    = PkiApplet.PIV
-        elif( self._select_by_aid(AID_IDPRIME) ):
-            self.pki_applet         = PkiApplet.IDPRIME
+            self.pki_applet         = PkiApplet.PIV
+        elif( self._select_by_aid(AID_IDPRIME_930) ):
+            self.pki_applet         = PkiApplet.IDPRIME_930
             self._is_thales_device  = True # It's a Thales device
-
+        elif( self._select_by_aid(AID_IDPRIME_940) ):
+            self.pki_applet         = PkiApplet.IDPRIME_940
+            self._is_thales_device  = True # It's a Thales device
+    
+    def _select_pki_applet(self):
+        if( self.pki_applet == PkiApplet.IDPRIME_930 ):
+            self._select_by_aid(AID_IDPRIME_930)
+            self._is_thales_device  = True # It's a Thales device
+        elif( self.pki_applet == PkiApplet.IDPRIME_940 ):
+            self._select_by_aid(AID_IDPRIME_940)
+            self._is_thales_device  = True # It's a Thales device
+        elif( self.pki_applet == PkiApplet.PIV ):
+            self._select_by_aid(AID_PIV)
                   
     def _discovery(self):
         """ Discover all applets inside the device; search for S/N"""
 
         self._discovery_pki()
 
-        if( self._pki_applet == PkiApplet.IDPRIME ):
+        if( self._pki_applet == PkiApplet.IDPRIME_930 ) or (self._pki_applet == PkiApplet.IDPRIME_940 ):
 
             ret, resp = self._read_file(b"\x00\x25")
             if( ret ):
@@ -140,21 +138,12 @@ class PcscThalesDevice(ThalesDevice):
             if( ret ):
                 self.pki_version = resp[3:]
 
-        # Search S/N in Card Manager
-        try:
-            resp, sw1, sw2 = self._conn.transmit(list(AID_CARD_MANAGER))
-            resp, sw1, sw2 = self._conn.transmit(list(APDU_GET_SN))
-            if (sw1, sw2) == SW_SUCCESS:
-                self.thales_serial_number = bytes(resp)[3:]
-        except:
-            # Unable to find Thales serial number. Possible for old devices
-            pass
     
         if( (self._has_fido != True) 
            and self._select_by_aid(AID_FIDO) ):
             self._has_fido  = True
 
-    def check_card_manager(self):
+    def _check_card_manager(self):
         try:
             resp, sw1, sw2 = self._conn.transmit(list(AID_CARD_MANAGER))
         except:
@@ -163,7 +152,8 @@ class PcscThalesDevice(ThalesDevice):
         try:
             resp, sw1, sw2 = self._conn.transmit(list(APDU_GET_DETAILS))
             if (sw1, sw2) == SW_SUCCESS:
-                self.thales_serial_number = bytes(resp)[3:]
+                self._parse_card_manager(bytes(resp))
+            return
         except:
             # Unable to find Thales serial number. Possible for old devices
             pass

@@ -33,8 +33,9 @@ from .atr import ATR
 class PkiApplet(Enum):
     UNKNOWN = -1
     NONE = 0
-    IDPRIME = 1
-    PIV = 2
+    IDPRIME_930 = 1
+    IDPRIME_940 = 2
+    PIV = 3
 
 # List of ATRs for Thales NFC devices
 ATRs = [
@@ -50,8 +51,8 @@ thales_vendor_id  = 0x08E6
 AID_PIV           = b"\xa0\x00\x00\x03\x08\x00\x00\x10\x00\x01\x00"
 AID_PIV_ADMIN     = b"\xa0\x00\x00\x03\x08\x00\x00\x10\x00\x02\x00"
 AID_IDPRIME       = b"\xa0\x00\x00\x00\x18\x80\x00\x00\x00\x06\x62"
-                    # A0 00 00 00 18 80 00 00 00 06 62 41 51  IDPRIME 930
-                    # A0 00 00 00 18 80 00 00 00 06 62 40 51  IDPRIME 940
+AID_IDPRIME_930   = b"\xa0\x00\x00\x00\x18\x80\x00\x00\x00\x41\x51"
+AID_IDPRIME_940   = b"\xa0\x00\x00\x00\x18\x80\x00\x00\x00\x40\x51"
 AID_CARD_MANAGER  = b"\x00\xA4\x04\x00\x00"
 
 # Standard APDU
@@ -59,7 +60,7 @@ APDU_SELECT       = b"\x00\xA4\x04\x00"
 APDU_SELECT_FILE  = b"\x00\xA4\x00\x0C"
 APDU_READ_BINARY  = b"\x00\xB0\x00\x00"
 APDU_GET_SN       = b"\x80\xCA\x01\x04\x00"
-APDU_GET_DETAILS  = b"\x80\xCA\x01\x05\x00"
+APDU_GET_DETAILS  = b"\x00\xCA\x01\x05\x00"
 APDU_GET_CONTAINER= b"\x00\xCB\x3F\xFF\x05\x5C"
 
 APDU_IDP_GET_DATA   = b"\x00\xCA"
@@ -70,4 +71,11 @@ TAG_NVM           = b"\xFF\xFF\x00\x06"
 TAG_PRODUCT_NAME  = b"\x80\x00\x11\x01"
 TAG_MODEL_NAME    = b"\x80\x00\x11\x02"
 TAG_CHIP_REF      = b"\x80\x00\x11\x59"
+
+# Thales Security Key Info File TAGs
+TAG_CM_SERIAL_NUMBER   = b"\xA1"
+TAG_CM_PRODUCT_NAME    = b"\xA2"
+TAG_CM_MODEL_NAME      = b"\xA3"
+TAG_CM_MASK            = b"\xA4"
+TAG_CM_DEVICE_INFO     = b"\xA5"
 

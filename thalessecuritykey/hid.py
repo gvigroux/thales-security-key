@@ -31,6 +31,7 @@
 import sys
 import struct
 from typing import Iterator
+from venv import logger
 from fido2.hid import CtapHidDevice, list_descriptors, open_connection
 
 from .device import ThalesDevice 
@@ -58,30 +59,30 @@ class CtapHidThalesDevice(CtapHidDevice, ThalesDevice):
             return f"CtapHidThalesDevice({self.name!r})"
     
 
-    def __eq__(self, other):
-        """ Ability to compare Thales Security Key with other Security Key 
-            Depending on the device firmware version, the serial number can be truncated on some old products
-        """
-        if( not self._is_thales_device ):
-            return False
-        if( self.thales_serial_number == None ):
-            return False
-
-        if ((self.device_version[0] < 30) 
-            and ( len(self.thales_serial_number)==12)
-            and ( len(other.thales_serial_number)==16)) :
-            return self.thales_serial_number == other.thales_serial_number[:12]
-        return self.thales_serial_number == other.thales_serial_number
+    #def __eq__(self, other):
+    #    """ Ability to compare Thales Security Key with other Security Key 
+    #        Depending on the device firmware version, the serial number can be truncated on some old products
+    #    """
+    #    if( not self._is_thales_device ):
+    #        return False
+    #    if( self.thales_serial_number == None ):
+    #        return False
+    #
+    #    if ((self.device_version[0] < 30) 
+    #        and ( len(self.thales_serial_number)==12)
+    #        and ( len(other.thales_serial_number)==16)) :
+    #        return self.thales_serial_number == other.thales_serial_number[:12]
+    #    return self.thales_serial_number == other.thales_serial_number
         
 
 
-    def update_from_pcsc(self, pcsc_device):
-        """ PCSC layer has more information than HID layer 
-            This method update the device with the information from PCSC layer
-        """
-        self._name  = pcsc_device.name
-        self._pki_applet    = pcsc_device.pki_applet
-        self._thales_serial_number = pcsc_device.thales_serial_number 
+    #def update_from_pcsc(self, pcsc_device):
+    #    """ PCSC layer has more information than HID layer 
+    #        This method update the device with the information from PCSC layer
+    #    """
+    #    self._name  = pcsc_device.name
+    #    self._pki_applet    = pcsc_device.pki_applet
+    #    self._thales_serial_number = pcsc_device.thales_serial_number 
 
 
   
@@ -99,12 +100,12 @@ class CtapHidThalesDevice(CtapHidDevice, ThalesDevice):
 
         resp = self.call_raw(0x50, b"\x00\x01\x55")
 
-        if (resp[0] == 1):
-            "This product do not have an accessible S/N"
+        if (resp[0] == 1):            
+            logger.info("This product do not have an accessible S/N")
             return False
         
         if (resp[0] != 0) or (resp[1] != 0x02) or (sys.getsizeof(resp) < 10): 
-            print("ERROR: Unable to get Thales Serial Number")
+            logger.error("Unable to get Thales Serial Number")
             return False
                 
         self.thales_serial_number = resp[2:]
