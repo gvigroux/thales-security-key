@@ -85,7 +85,7 @@ class ThalesDevice():
         return self._has_otp
 
     @property
-    def thales_serial_number(self) -> Optional[str]:
+    def serial_number(self) -> Optional[str]:
         """Serial number of the device."""
         if( self._custom_serial_number != None) :
             return self._custom_serial_number
@@ -94,10 +94,13 @@ class ThalesDevice():
         if( self._pki_serial_number != None) :
             return self._pki_serial_number
         return None
-    
-    @thales_serial_number.setter
-    def thales_serial_number(self, value: bytes):
-        self._thales_serial_number = self._parse_bytes(value)
+
+    @serial_number.setter
+    def serial_number(self, value):
+        if isinstance(value, bytes):
+            self._thales_serial_number = self._parse_bytes(value)
+        else:
+            self._thales_serial_number = value
 
     @property
     def pki_version(self):
@@ -130,7 +133,7 @@ class ThalesDevice():
     #    return "".join("{:02x} ".format(x) for x in value).upper()
 
     def _parse_bytes(self, value : bytes):
-        return value.decode("utf-8").split('\x00', 1)[0]
+        return value.decode("utf-8").strip('\x00')
     
     def _parse_card_manager(self, bytes):
         index=0
@@ -230,7 +233,7 @@ class ThalesDevice():
         print (self)
         print (f"Is thales:   {self.is_thales_device}")
         print (f"Name:        {self.name}")
-        print (f"Serial:      {self.thales_serial_number}")
+        print (f"Serial:      {self.serial_number}")
         print (f"Properties:  {self._applets_detail}" )
         if( full ):
             print (f"Model:       {self._model_name}")

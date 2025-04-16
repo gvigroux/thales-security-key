@@ -38,13 +38,16 @@ from .device import ThalesDevice
 from .const import (thales_vendor_id)
 
 
-class CtapHidThalesDevice(CtapHidDevice, ThalesDevice):
+class CtapHidThalesDevice(ThalesDevice, CtapHidDevice):
     def __init__(self, descriptor, connection,):
         ThalesDevice.__init__(self, descriptor.product_name, True)
-        super().__init__(descriptor, connection)
+        CtapHidDevice.__init__(self, descriptor, connection)
+
+        # Set to default value
+        self._fido_version = '.'.join(map(str, self._device_version))
 
         # Setup the Thales Serial Number with this default value
-        self._thales_serial_number = descriptor.serial_number
+        self.serial_number = descriptor.serial_number
 
         # if firmware = 31, 2, 3, it returns the FIDO applet version
         self._discovery()
@@ -53,38 +56,11 @@ class CtapHidThalesDevice(CtapHidDevice, ThalesDevice):
 
     def __repr__(self):
         try:
-            return f"CtapHidThalesDevice({self.name!r}, {self.device_version}, {self.thales_serial_number})"
+            return f"CtapHidThalesDevice({self.name!r}, {self.device_version}, {self.serial_number})"
         except:
             # The object is not yet fully initialized
             return f"CtapHidThalesDevice({self.name!r})"
     
-
-    #def __eq__(self, other):
-    #    """ Ability to compare Thales Security Key with other Security Key 
-    #        Depending on the device firmware version, the serial number can be truncated on some old products
-    #    """
-    #    if( not self._is_thales_device ):
-    #        return False
-    #    if( self.thales_serial_number == None ):
-    #        return False
-    #
-    #    if ((self.device_version[0] < 30) 
-    #        and ( len(self.thales_serial_number)==12)
-    #        and ( len(other.thales_serial_number)==16)) :
-    #        return self.thales_serial_number == other.thales_serial_number[:12]
-    #    return self.thales_serial_number == other.thales_serial_number
-        
-
-
-    #def update_from_pcsc(self, pcsc_device):
-    #    """ PCSC layer has more information than HID layer 
-    #        This method update the device with the information from PCSC layer
-    #    """
-    #    self._name  = pcsc_device.name
-    #    self._pki_applet    = pcsc_device.pki_applet
-    #    self._thales_serial_number = pcsc_device.thales_serial_number 
-
-
   
     def _discovery(self) -> bool:
         """
@@ -108,7 +84,7 @@ class CtapHidThalesDevice(CtapHidDevice, ThalesDevice):
             logger.error("Unable to get Thales Serial Number")
             return False
                 
-        self.thales_serial_number = resp[2:]
+        self.serial_number = resp[2:]
         return True
 
 
@@ -128,11 +104,15 @@ class CtapHidThalesDevice(CtapHidDevice, ThalesDevice):
               
         return recv[7:]
     
-    def _do_call(self, command, data, event, on_keepalive):
-        bytes = super()._do_call( command, data, event, on_keepalive)
-        return bytes
+    #def _do_call(self, command, data, event, on_keepalive):
+    #    bytes = super()._do_call( command, data, event, on_keepalive)
+    #    return bytes
 
     @classmethod
-    def list_devices(cls) -> Iterator[CtapHidDevice]:
+    def list_devices(cls, thales_only = True, serial_number = None) -> Iterator[CtapHidDevice]:
         for d in list_descriptors():
-            yield cls(d, open_connection(d))
+            dev = cls(d, open_connection(d))
+            if( not thales_only ) or ( dev.is_thales_device and thales_only):
+                if( not serial_number ) or ( dev.serial_number == serial_number):
+                    yield dev
+    

@@ -49,21 +49,23 @@ from .const import *
 #******************************************************************************
 # Default class for PCSC connection (PKI & FIDO)
 
-class PcscThalesDevice(ThalesDevice):
+class PcscThalesDevice(ThalesDevice, CtapPcscDevice):
     def __init__(self, connection: CardConnection, name: str, has_fido: bool = False):
         super().__init__(name, has_fido)
         self._conn = connection
+        
+        try:
+            CtapPcscDevice.__init__(self, connection, name)
+            self._has_fido = True
+        except: 
+            pass
+        
         # The connection is not yet open
         if( self._conn.component.hcard == None):
             self._conn.connect()
 
         self._check_card_manager()
         self._discovery()
-        
-        
-        if( (self._has_fido != True) 
-           and self._select_by_aid(AID_FIDO) ):
-            self._has_fido  = True
         
         try:
             # Check if the device is a Thales device
@@ -77,10 +79,10 @@ class PcscThalesDevice(ThalesDevice):
             
 
     def __repr__(self):
-        return f"PcscThalesDevice({self.name}, {self.thales_serial_number})"
+        return f"PcscThalesDevice({self.name}, {self.serial_number})"
     
     def __eq__(self, other): 
-        return self.thales_serial_number == other.thales_serial_number
+        return self.serial_number == other.serial_number
       
     def _check_card_manager(self):
         ''' Select the Card Manager to retrieve basic product information'''
@@ -91,9 +93,9 @@ class PcscThalesDevice(ThalesDevice):
         if(ret := self._transmit(APDU_GET_DETAILS))[0]:
             self._parse_card_manager(bytes(ret[1]))
             
-        ''' Get S/N from the Card Maanger'''
-        if(self.thales_serial_number == None) and (ret := self._transmit(APDU_GET_SN))[0]:
-            self.thales_serial_number = bytes(ret[1])[3:]
+        ''' Get S/N from the Card Manager'''
+        if(self.serial_number == None) and (ret := self._transmit(APDU_GET_SN))[0]:
+            self.serial_number = bytes(ret[1])[3:]
        
 
     def _discovery(self):
@@ -110,19 +112,17 @@ class PcscThalesDevice(ThalesDevice):
         elif( self.pki_applet == PkiApplet.PIV ):
             self._select_by_aid(AID_PIV)
         
-        if( self._pki_applet == PkiApplet.IDPRIME_930 ) or (self._pki_applet == PkiApplet.IDPRIME_940 ):
+        if( self._pki_applet == PkiApplet.IDPRIME_930 ) or (self._pki_applet == PkiApplet.IDPRIME_940 ) or (self._pki_applet == PkiApplet.IDPRIME ):
 
             if (ret := self._get_data(b"\xDF\x30", 0x00))[0]:
                 self.pki_version = ret[1][3:]
 
-        elif( self._pki_applet == PkiApplet.PIV ):
-
-            self._select_by_aid(AID_PIV_ADMIN)
+        elif( self._pki_applet == PkiApplet.PIV ) and (self._select_by_aid(AID_PIV_ADMIN)):            
 
             ret, resp = self._get_data(b"\xDF\x30") 
             if( ret ):
                 self.pki_version = resp[3:]
-                self._is_thales_device  = True # It's a Thales device
+                self._is_thales_device  = True
 
                   
     def _discovery_legacy(self):
@@ -163,10 +163,13 @@ class PcscThalesDevice(ThalesDevice):
                 self._custom_serial_number = ret[1][2:].decode("utf-8").upper()
                 self._is_thales_device  = True # It's a Thales device
 
-            self._select_by_aid(AID_PIV_ADMIN)
-                
-            if (ret := self._get_data(b"\xDF\x30"))[0]:
-                self.pki_version = ret[1][3:]
+            if( self._transmit(AID_CARD_MANAGER) == False ):
+                return
+        
+            # This select can fail just after inserting the device when SAC is enabled
+            if( self._select_by_aid(AID_PIV_ADMIN) ):
+                if (ret := self._get_data(b"\xDF\x30"))[0]:
+                    self.pki_version = ret[1][3:]
 
 
     def close(self) -> None:
@@ -201,9 +204,9 @@ class PcscThalesDevice(ThalesDevice):
 
         resp, sw1, sw2 = self._conn.transmit(list(apdu))
         if( sw1 == 0x6C ) and ( le == 0x00 ):
+            print("TO UPGRADE TO _TRANSMIT")
             return self._get_data(data_id, sw2)
         if (sw1, sw2) != SW_SUCCESS:
-            logging.debug("Error ["+hex(sw1)+","+hex(sw2)+"] after sending APDU")
             return False, bytes(resp)
         return True, bytes(resp)
 
@@ -225,43 +228,47 @@ class PcscThalesDevice(ThalesDevice):
                 return False, None
             return True, bytes(resp)
         except:
-            return False
+            return False, None
 
     @classmethod
-    def list_devices(cls, name: str = "") -> Iterator[CtapPcscDevice] : # type: ignore
+    def list_devices(cls, thales_only = True, pcsc_reader: str = "", serial_number = None) -> Iterator[CtapPcscDevice] : # type: ignore
         for reader in _list_readers():
-            if (name in reader.name):
-                try:
-                    yield cls(reader.createConnection(), reader.name)
-                except Exception as e:
-                    pass
+            if( pcsc_reader ) and (pcsc_reader not in reader.name):
+                continue
+            try:
+                dev = cls(reader.createConnection(), reader.name)
+                if( not thales_only ) or ( dev.is_thales_device and thales_only):
+                    if( not serial_number ) or ( dev.serial_number == serial_number):
+                        yield dev
+            except Exception as e:
+                pass
 
 
 #******************************************************************************
 # Default class for PCSC connection (PKI & FIDO)
 
-class CtapPcscThalesDevice(CtapPcscDevice, PcscThalesDevice):
-    def __init__(self, connection: CardConnection, name: str):
-        #super().__init__(connection, name)
-        PcscThalesDevice.__init__(self, connection, name, True)
-        try:
-            CtapPcscDevice.__init__(self, connection, name)
-        except: 
-            self._has_fido = False
+# class CtapPcscThalesDevice(CtapPcscDevice, PcscThalesDevice):
+#     def __init__(self, connection: CardConnection, name: str):
+#         #super().__init__(connection, name)
+#         PcscThalesDevice.__init__(self, connection, name, True)
+#         try:
+#             CtapPcscDevice.__init__(self, connection, name)
+#         except: 
+#             self._has_fido = False
 
-    def __repr__(self):
-        return f"CtapPcscThalesDevice({self._name}, {self.thales_serial_number})"
+#     def __repr__(self):
+#         return f"CtapPcscThalesDevice({self._name}, {self.serial_number})"
     
-    @classmethod
-    def list_devices(cls, name: str = "") -> Iterator[CtapPcscDevice] :  # type: ignore
-        for reader in _list_readers():
-            if (name != None) and (name in reader.name):
-                try:
-                    yield cls(reader.createConnection(), reader.name)
-                except  Exception as e:
-                    pass    
+#     @classmethod
+#     def list_devices(cls, name: str = "") -> Iterator[CtapPcscDevice] :  # type: ignore
+#         for reader in _list_readers():
+#             if (name != None) and (name in reader.name):
+#                 try:
+#                     yield cls(reader.createConnection(), reader.name)
+#                 except  Exception as e:
+#                     pass    
     
-    @classmethod
-    def from_pcsc_thales_device(cls, pcsc_thales_device: PcscThalesDevice):
-        return cls(pcsc_thales_device._conn, pcsc_thales_device.name)
+#     @classmethod
+#     def from_pcsc_thales_device(cls, pcsc_thales_device: PcscThalesDevice):
+#         return cls(pcsc_thales_device._conn, pcsc_thales_device.name)
     

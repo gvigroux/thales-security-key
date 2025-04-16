@@ -4,7 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "thalessecuritykey"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
-    "fido2"
+    "fido2",
+    "fido2[PCSC]"
 ]

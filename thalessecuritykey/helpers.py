@@ -33,8 +33,10 @@ from smartcard import System
 import ctypes, os
 
 from fido2.hid import CtapHidDevice
+
+from thalessecuritykey.device import ThalesDevice
 from .hid import CtapHidThalesDevice
-from .pcsc import CtapPcscThalesDevice, PcscThalesDevice
+from .pcsc import PcscThalesDevice
 from .const import ATRs, thales_vendor_id
 
 try:
@@ -62,7 +64,7 @@ def check_requirements() -> bool:
 
 
 def is_thales_device(device):
-    if isinstance(device, CtapHidThalesDevice) or isinstance(device, CtapPcscThalesDevice):
+    if isinstance(device, ThalesDevice):
         return True
     if isinstance(device, CtapHidDevice) and (device.descriptor.vid == thales_vendor_id):
         return True
@@ -74,148 +76,33 @@ def is_thales_device(device):
     return False
 
 
-def single_device(thales_only=True, prompt=True, status=0):
-    if( thales_only ):
-        devices = list(enumerate_thales_devices())
-    else:
-        devices = list(enumerate_devices())
-    if( len(devices) == 0):
-        if( prompt ) and ((status == 0) or (status == 1)):
-            print(">>> Scanning for Security Key...")
-            status = 2
-        sleep(1)
-        return single_device(thales_only, prompt, status)
-    if( len(devices) > 1):
-        if( prompt ) and ((status == 0) or (status == 2)):
-            print(">>> More than one device found ...")
-        sleep(1)
-        return single_device(thales_only,prompt,1)
-    return devices
 
 
-def filter_by_serial_number(devices, serial_number):
-    if( serial_number == None ) or ( len(devices) == 0):
-        return devices
-    for index, device in enumerate(devices): 
-        if( device.thales_serial_number != serial_number ):
-            devices.pop(index)
-        return devices
+def scan_devices(fido_only=False, thales_only=True, wait=True, serial_number = None, pcsc_reader = None) :
     
+    # Get list of valid HID FIDO devices
+    devices = list(enumerate_hid_devices(thales_only, serial_number))
 
-
-def scan_pcsc_devices(wait=False, serial_number = None, reader = None):
-    
-    pcsc_devices = list(enumerate_pcsc_devices(reader))
-    pcsc_devices = filter_by_serial_number(pcsc_devices, serial_number)
-
-    if( len(pcsc_devices) == 0) and ( wait ):
-        sleep(1)
-        return scan_pcsc_devices(wait, serial_number, reader)    
-    
-    return pcsc_devices
-
-
-
-def scan_devices(thales_only=True, wait=False, fido_only=True, serial_number = None, reader = None):
-    
-    # Get list of HID devices
-    devices = list(enumerate_hid_devices())
-     
-    for loop_reader in scan_pcsc_readers():
-        try:
-            devices.append(next(CtapPcscThalesDevice.list_devices(loop_reader.name)))
-            break
-        except Exception as e:
-            pass
-
-        if( not fido_only ):
-            try:
-                devices.append(next(enumerate_pcsc_devices(loop_reader.name)))
-            except:
-                pass
-
-
-    # Remove devices with other serial number
-    devices = filter_by_serial_number(devices, serial_number)
-
+    # Add all PCSC valid devices (FIDO & NON-FIDO)
+    devices += list(enumerate_pcsc_devices(thales_only, pcsc_reader))
 
     if( len(devices) == 0) and ( wait ):
         try:
             sleep(1)
         except KeyboardInterrupt:
             return []
-        return scan_devices(thales_only, wait, fido_only, serial_number, reader)    
+        return scan_devices(fido_only, thales_only, wait, serial_number, pcsc_reader)    
  
     return devices
 
-def scan_pcsc_readers():
-    return System.readers()
 
 
-
-def clean_device_list(devices, pcsc_devices):
-
-    # FIDO 2.0: devices are accessible through HiD and PCSC
-    # This loop eliminate PCSC device when the same device is found in HID
-    for device1 in devices:
-        if(not isinstance(device1, CtapHidThalesDevice)):
-            continue
-        for index, device2 in enumerate(devices): 
-            if(not isinstance(device2, CtapPcscThalesDevice)):
-                continue
-            if( device1 == device2 ):
-                device1.update_from_pcsc(device2)
-                devices.pop(index) # Remove device2 from the list
-
-
-    # FIDO 2.1: FIDO is accessible through HID only but we can get more info through PCSC
-    for device in devices:
-        if(not isinstance(device, CtapHidThalesDevice)):
-            continue
-        for pcsc_device in pcsc_devices:
-            if( device == pcsc_device ):
-                device.update_from_pcsc(pcsc_device)
-                pass
-
-    return devices
-
-
-def enumerate_hid_devices():
-    for dev in CtapHidThalesDevice.list_devices():
+def enumerate_hid_devices(thales_only=True, serial_number = None):
+    for dev in CtapHidThalesDevice.list_devices(thales_only, serial_number):
         yield dev
 
 
-def enumerate_devices(reader: str = ""):
-    reader = str(reader or '')
-    for dev in CtapHidDevice.list_devices():
+def enumerate_pcsc_devices(thales_only=True, pcsc_reader = None):
+    for dev in PcscThalesDevice.list_devices(thales_only, pcsc_reader):
         yield dev
-    if CtapPcscDevice:
-        for dev in CtapPcscDevice.list_devices(reader):
-            yield dev
-
-
-def enumerate_thales_devices(reader: str = ""):
-    "This method is used to enumerate all the Thales Security Key available on the system."
-    reader = str(reader or '')
-    for dev in CtapHidThalesDevice.list_devices():
-        yield dev
-    if CtapPcscDevice:
-        for dev in CtapPcscThalesDevice.list_devices(reader):
-            yield dev
-
-            
-def enumerate_pcsc_devices(reader: str = ""):
-    "List all available PCSC Thales devices."
-    reader = str(reader or '')
-    try:
-        if CtapPcscDevice:
-            for dev in PcscThalesDevice.list_devices(reader):
-                dev.close()
-                yield dev
-            
-    except Exception as e:
-        pass
-
-
-
 

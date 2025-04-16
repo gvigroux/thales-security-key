@@ -1,3 +1,4 @@
+.pytest_cache/
 thalessecuritykey.egg-info/
 __pycache__/
 *.pyc
