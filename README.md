@@ -32,4 +32,8 @@ for device in devices:
 ## Internal use:
 
 python -m build
-pip install .\dist\thalessecuritykey-0.0.6-py3-none-any.whl --force-reinstall
+pip install .\dist\thalessecuritykey-0.0.7-py3-none-any.whl --force-reinstall
+
+py -m pip install --upgrade build
+py -m build
+py -m pip install --upgrade twine
