@@ -31,9 +31,12 @@ for device in devices:
 
 ## Internal use:
 
+pip install pyscard==2.2.1
+
 python -m build
-pip install .\dist\thalessecuritykey-0.0.7-py3-none-any.whl --force-reinstall
+pip install .\dist\thalessecuritykey-0.0.8-py3-none-any.whl --force-reinstall
 
 py -m pip install --upgrade build
 py -m build
 py -m pip install --upgrade twine
+py -m twine upload --repository testpypi dist/\*

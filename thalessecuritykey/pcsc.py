@@ -33,17 +33,9 @@ import struct
 import logging
 from typing import Iterator,  Tuple
 
-try:
-    from fido2.pcsc import CtapPcscDevice, _list_readers, SW_SUCCESS, CardConnection, AID_FIDO
-except ImportError:
-    CtapPcscDevice = None
-    _list_readers  = None
-    AID_FIDO       = None 
-    SW_SUCCESS     = (0x90, 0x00)
-
+from fido2.pcsc import CtapPcscDevice, _list_readers, SW_SUCCESS, CardConnection
 from .device import PkiApplet, ThalesDevice
 from .const import *
-
 
 
 #******************************************************************************
@@ -57,6 +49,7 @@ class PcscThalesDevice(ThalesDevice, CtapPcscDevice):
         try:
             CtapPcscDevice.__init__(self, connection, name)
             self._has_fido = True
+            self._has_fido_accessible = True
         except: 
             pass
         
@@ -137,7 +130,7 @@ class PcscThalesDevice(ThalesDevice, CtapPcscDevice):
             self.pki_applet     = PkiApplet.IDPRIME_940
         elif( self._select_by_aid(AID_IDPRIME) ):
             self.pki_applet     = PkiApplet.IDPRIME
-            print("I SHOULD NOT BE THERE")
+            #print("I SHOULD NOT BE THERE")
 
         if( self.has_idprime ):
             
@@ -204,7 +197,6 @@ class PcscThalesDevice(ThalesDevice, CtapPcscDevice):
 
         resp, sw1, sw2 = self._conn.transmit(list(apdu))
         if( sw1 == 0x6C ) and ( le == 0x00 ):
-            print("TO UPGRADE TO _TRANSMIT")
             return self._get_data(data_id, sw2)
         if (sw1, sw2) != SW_SUCCESS:
             return False, bytes(resp)
@@ -221,7 +213,7 @@ class PcscThalesDevice(ThalesDevice, CtapPcscDevice):
         apdu = APDU_SELECT + struct.pack("!B", len(aid)) + aid
         return self._transmit(list(apdu))[0]
         
-    def _transmit(self, data ) -> Tuple[bool, bytes]:
+    def _transmit(self, data, le = 0x00 ) -> Tuple[bool, bytes]:
         try:
             resp, sw1, sw2 = self._conn.transmit(list(data))
             if (sw1, sw2) != SW_SUCCESS:
@@ -231,15 +223,17 @@ class PcscThalesDevice(ThalesDevice, CtapPcscDevice):
             return False, None
 
     @classmethod
-    def list_devices(cls, thales_only = True, pcsc_reader: str = "", serial_number = None) -> Iterator[CtapPcscDevice] : # type: ignore
+    def list_devices(cls, fido_only=False, thales_only = True, pcsc_reader: str = "", serial_number = None) -> Iterator[CtapPcscDevice] : # type: ignore
         for reader in _list_readers():
-            if( pcsc_reader ) and (pcsc_reader not in reader.name):
+            if(pcsc_reader) and (pcsc_reader not in reader.name):
                 continue
             try:
                 dev = cls(reader.createConnection(), reader.name)
-                if( not thales_only ) or ( dev.is_thales_device and thales_only):
-                    if( not serial_number ) or ( dev.serial_number == serial_number):
-                        yield dev
+                if(not thales_only) or (dev.is_thales_device and thales_only):
+                    if(not serial_number) or (dev.serial_number == serial_number):
+                        if(not fido_only) or (dev.has_fido_accessible):
+                            yield dev
+                dev.close()
             except Exception as e:
                 pass
 

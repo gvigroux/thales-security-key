@@ -4,8 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "thalessecuritykey"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
+    "pyscard==2.2.1",
     "fido2",
     "fido2[PCSC]"
 ]

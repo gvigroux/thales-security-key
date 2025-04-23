@@ -31,10 +31,11 @@ from thalessecuritykey import helpers
 
 for _ in iter(int, 1):
     print("\33[93mWaiting device...\33[0m")
-    devices   = helpers.scan_devices(pcsc_reader="bob", serial_number="231WFL76")
+    devices   = helpers.scan_devices(True)
     print("\33[93mFound [%d] device(s)...\33[0m" % len(devices))
     for device in devices:
         device.dump()
         print("")
     input("\33[93mPress Enter to continue...\33[0m")
+
 

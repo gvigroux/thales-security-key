@@ -84,7 +84,7 @@ def scan_devices(fido_only=False, thales_only=True, wait=True, serial_number = N
     devices = list(enumerate_hid_devices(thales_only, serial_number))
 
     # Add all PCSC valid devices (FIDO & NON-FIDO)
-    devices += list(enumerate_pcsc_devices(thales_only, pcsc_reader))
+    devices += list(enumerate_pcsc_devices(fido_only, thales_only, pcsc_reader))
 
     if( len(devices) == 0) and ( wait ):
         try:
@@ -102,7 +102,7 @@ def enumerate_hid_devices(thales_only=True, serial_number = None):
         yield dev
 
 
-def enumerate_pcsc_devices(thales_only=True, pcsc_reader = None):
-    for dev in PcscThalesDevice.list_devices(thales_only, pcsc_reader):
+def enumerate_pcsc_devices(fido_only=False, thales_only=True, pcsc_reader = None):
+    for dev in PcscThalesDevice.list_devices(fido_only, thales_only, pcsc_reader):
         yield dev
 

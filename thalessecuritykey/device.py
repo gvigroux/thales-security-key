@@ -41,6 +41,7 @@ class ThalesDevice():
         self._pki_applet            = PkiApplet.UNKNOWN
         self._name                  = name
         self._has_fido              = has_fido
+        self._has_fido_accessible   = has_fido
         self._fido_version          = None
         self._is_thales_device      = False
         self._model_name            = None
@@ -61,6 +62,14 @@ class ThalesDevice():
     @has_fido.setter
     def has_fido(self, value):
         self._has_fido = value
+
+    @property
+    def has_fido_accessible(self) -> bool:
+        return self._has_fido_accessible
+    
+    @has_fido_accessible.setter
+    def has_fido_accessible(self, value):
+        self._has_fido_accessible = value
 
     @property
     def has_pki(self) -> bool:
@@ -220,6 +229,8 @@ class ThalesDevice():
         out = ""
         if( self.has_fido ):
             out += f"FIDO ({self.fido_version})"
+            if(not self.has_fido_accessible):
+                out += " (unreachable)"
         if( self.has_pki ):
             if( len(out) > 0): out += ", "
             out += f"{self._pki_applet} ({self._pki_version})"
