@@ -4,7 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "thalessecuritykey"
-version = "0.0.8"
+description = "Library accessing Thales Security keys (FIDO & PKI)"
+readme = "README.md"
+version = "0.0.9"
 dependencies = [
     "pyscard==2.2.1",
     "fido2",
