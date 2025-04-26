@@ -26,6 +26,6 @@ for device in devices:
 from thalessecuritykey import helpers
 devices = helpers.scan_devices()
 for device in devices:
-    print(device)
+    device.dump()
 ```
 
