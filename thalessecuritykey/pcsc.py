@@ -52,7 +52,7 @@ class PcscThalesDevice(ThalesDevice, CtapPcscDevice):
             self._has_fido_accessible = True
         except: 
             pass
-        
+
         # The connection is not yet open
         if( self._conn.component.hcard == None):
             self._conn.connect()
@@ -68,7 +68,12 @@ class PcscThalesDevice(ThalesDevice, CtapPcscDevice):
                     self._is_thales_device = True
                     break
         except Exception as e:
-            print("Error %r", e)
+            print("ATR Error %r", e)
+
+        # Select the FIDO Applet to enable all FIDO commmands
+        self._select()
+
+            
             
 
     def __repr__(self):
@@ -229,11 +234,14 @@ class PcscThalesDevice(ThalesDevice, CtapPcscDevice):
                 continue
             try:
                 dev = cls(reader.createConnection(), reader.name)
+                close = True
                 if(not thales_only) or (dev.is_thales_device and thales_only):
                     if(not serial_number) or (dev.serial_number == serial_number):
                         if(not fido_only) or (dev.has_fido_accessible):
+                            close = False
                             yield dev
-                dev.close()
+                if( close ):
+                    dev.close()
             except Exception as e:
                 pass
 

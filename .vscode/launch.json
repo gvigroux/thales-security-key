@@ -8,7 +8,7 @@
       "name": "Debug detect.py",
       "type": "debugpy",
       "request": "launch",
-      "module": "example.detect",
+      "module": "example.fido_make_credential",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "justMyCode": false
