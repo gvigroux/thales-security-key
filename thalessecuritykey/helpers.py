@@ -29,20 +29,15 @@
 
 
 from time import sleep
-from smartcard import System
 import ctypes, os
 
 from fido2.hid import CtapHidDevice
+from fido2.pcsc import CtapPcscDevice
 
 from thalessecuritykey.device import ThalesDevice
 from .hid import CtapHidThalesDevice
 from .pcsc import PcscThalesDevice
 from .const import ATRs, thales_vendor_id
-
-try:
-    from fido2.pcsc import CtapPcscDevice
-except ImportError:
-    CtapPcscDevice = None
 
 def is_user_admin() -> bool:
     is_admin = False
@@ -74,7 +69,6 @@ def is_thales_device(device):
             if( atr.isValid(device.get_atr()) ): 
                 return True
     return False
-
 
 
 

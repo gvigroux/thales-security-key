@@ -57,18 +57,18 @@ class PcscThalesDevice(ThalesDevice, CtapPcscDevice):
         if( self._conn.component.hcard == None):
             self._conn.connect()
 
+        atr = bytes(self._conn.getATR())
         self._check_card_manager()
         self._discovery()
         
         try:
             # Check if the device is a Thales device
-            atr = bytes(self._conn.getATR())
             for atr_entry in ATRs:
                 if( atr_entry.isValid(atr) ): 
                     self._is_thales_device = True
                     break
         except Exception as e:
-            print("ATR Error %r", e)
+            print("ATR Error (%s) %r", name, e)
 
         # Select the FIDO Applet to enable all FIDO commmands
         self._select()
